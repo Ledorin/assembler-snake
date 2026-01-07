@@ -274,8 +274,22 @@ check_area_to_the_right_of_snake_tail:
     mov si,snake_tail_orig_si
     jmp start_check_area_to_the_left_of_snake_tail
 adjust_snake_tail_check_right_offset:
-    sub si,game_area_column_count
+    mov ax,0000h
+    mov al,game_area_column_count
+    sub si,ax
     jmp check_area_to_the_right_of_snake_tail
+update_snake_tail_right:
+    mov bx,0000h
+    mov bl,snake_tail_x
+    cmp bl,game_area_column_count
+    je adjust_snake_tail_to_left_of_screen
+    add bl,01h
+set_new_snake_tail_right:
+    mov snake_tail_x,bl
+    jmp update_snake_tail_end
+adjust_snake_tail_to_left_of_screen:
+    mov bl,00h
+    jmp set_new_snake_tail_right
 
     ; if not, check if column to the left, current minus two is M, if yes, update snake tail to the right
 start_check_area_to_the_left_of_snake_tail:
@@ -290,46 +304,10 @@ check_area_to_the_left_of_snake_tail:
     mov si,snake_tail_orig_si
     jmp start_check_area_to_the_up_of_snake_tail
 adjust_snake_tail_check_left_offset:
-    add si,game_area_column_count
+    mov ax,0000h
+    mov al,game_area_column_count
+    add si,ax
     jmp check_area_to_the_left_of_snake_tail
-
-    ; if still not, check if column to up is M, current minus column count, if yes, update snake tail to up
-start_check_area_to_the_up_of_snake_tail
-    mov al,snake_tail_y
-    cmp al,00h
-    je adjust_snake_tail_check_up_offset
-check_area_to_the_up_of_snake_tail:
-    mov bx,0000h
-    mov bl,game_area_column_count
-    sub si,bx
-    mov al,ds:[si]
-    cmp al,4Dh
-    je update_snake_tail_up
-adjust_snake_tail_check_up_offset:
-    
-
-    ; if still not found, check if column to down is M, current + two times column count, if yes, update snake tail to down
-    mov bx,0000h
-    mov bl,game_area_column_count
-    add si,bx
-    add si,bx
-    mov al,ds:[si]
-    cmp al,4Dh
-    je update_snake_tail_down
-
-update_snake_tail_right:
-    mov bx,0000h
-    mov bl,snake_tail_x
-    cmp bl,game_area_column_count
-    je adjust_snake_tail_to_left_of_screen
-    add bl,01h
-set_new_snake_tail_right:
-    mov snake_tail_x,bl
-    jmp update_snake_tail_end
-adjust_snake_tail_to_left_of_screen:
-    mov bl,00h
-    jmp set_new_snake_tail_right
-
 update_snake_tail_left:
     mov bx,0000h
     mov bl,snake_tail_x
@@ -343,19 +321,30 @@ adjust_snake_tail_to_right_of_screen:
     mov bl,game_area_column_count
     jmp set_new_snake_tail_left
 
-update_snake_tail_down:
+    ; if still not, check if column to up is M, current minus column count, if yes, update snake tail to up
+start_check_area_to_the_up_of_snake_tail:
+    mov al,snake_tail_y
+    cmp al,00h
+    je adjust_snake_tail_check_up_offset
     mov bx,0000h
-    mov bl,snake_tail_y
-    cmp bl,game_area_row_count
-    je adjust_snake_tail_to_top_of_screen
-    add bl,01h
-set_new_snake_tail_down:
-    mov snake_tail_y,bl
-    jmp update_snake_tail_end
-adjust_snake_tail_to_top_of_screen:
-    mov bl,00h
-    jmp set_new_snake_tail_down
-
+    mov bl,game_area_column_count
+    sub si,bx
+check_area_to_the_up_of_snake_tail:
+    mov al,ds:[si]
+    cmp al,4Dh
+    je update_snake_tail_up
+    mov si,snake_tail_orig_si
+    jmp start_check_area_to_the_down_of_snake_tail
+adjust_snake_tail_check_up_offset:
+    mov ax,0000h
+    mov al,game_area_row_count
+    sub al,01h
+    mov bl,game_area_column_count
+    mul bl
+    add al,snake_tail_x
+    lea si,game_area
+    add si,ax
+    jmp check_area_to_the_up_of_snake_tail
 update_snake_tail_up:
     mov bx,0000h
     mov bl,snake_tail_y
@@ -368,6 +357,38 @@ set_new_snake_tail_up:
 adjust_snake_tail_to_down_of_screen:
     mov bl,game_area_row_count
     jmp set_new_snake_tail_up
+
+    ; if still not found, check if column to down is M, current + two times column count, if yes, update snake tail to down
+start_check_area_to_the_down_of_snake_tail:
+    mov al,snake_tail_y
+    cmp al,game_area_row_count
+    je adjust_snake_tail_check_down_offset
+    mov bx,0000h
+    mov bl,game_area_column_count
+    add si,bx
+check_area_to_the_down_of_snake_tail:
+    mov al,ds:[si]
+    cmp al,4Dh
+    je update_snake_tail_down
+    jmp update_snake_tail_end
+adjust_snake_tail_check_down_offset:
+    lea si,game_area
+    mov ax,0000h
+    mov al,snake_tail_x
+    add si,ax
+    jmp check_area_to_the_down_of_snake_tail
+update_snake_tail_down:
+    mov bx,0000h
+    mov bl,snake_tail_y
+    cmp bl,game_area_row_count
+    je adjust_snake_tail_to_top_of_screen
+    add bl,01h
+set_new_snake_tail_down:
+    mov snake_tail_y,bl
+    jmp update_snake_tail_end
+adjust_snake_tail_to_top_of_screen:
+    mov bl,00h
+    jmp set_new_snake_tail_down
 
 update_snake_tail_end:
     ret
