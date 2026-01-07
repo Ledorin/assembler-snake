@@ -8,22 +8,23 @@
     game_area_y_loop_index db 0 ; used to loop game_area array. keeps track of row
     snake_head_x db 06h
     snake_head_y db 04h
-    snake_tail_x db 03h
+    snake_tail_x db 06h
+    snake_tail_y db 04h
     snake_tail_real_x dw 0
     snake_tail_real_y dw 0
     snake_tail_orig_si dw 0
-    snake_tail_y db 04h
-    snake_direction db 0
+    snake_direction db 52h
     x_coord dw 10       ; x coordinate
     y_coord dw 30       ; y coordinate
     snake_part_width db 5 ; rect width
     snake_part_height db 5 ; rect height
     current_key_press db ?
     ; constants
-    RIGHT EQU 0
-    DOWN EQU 1
-    LEFT EQU 2
-    UP EQU 3
+    RIGHT EQU 52h
+    DOWN EQU 44h
+    LEFT EQU 4Ch
+    UP EQU 55h
+    STOP EQU 53h
     SCREEN_RAM EQU 0A000h ; Screen RAM start address
     ESC_KEY EQU 1Bh
     W_KEY EQU 77h
@@ -84,25 +85,25 @@ update_direction proc
     jmp end_update_direction
 update_direction_up:
     mov bl,snake_direction
-    cmp bl,DOWN
+    cmp bl,DOWN ; cant go up if current direction is down
     je end_update_direction
     mov snake_direction,UP
     jmp end_update_direction
 update_direction_left:
     mov bl,snake_direction
-    cmp bl,RIGHT
+    cmp bl,RIGHT ; cant go left if current direction is right
     je end_update_direction
     mov snake_direction,LEFT
     jmp end_update_direction
 update_direction_right:
     mov bl,snake_direction
-    cmp bl,LEFT
+    cmp bl,LEFT ; cant go right if current direction is left
     je end_update_direction
     mov snake_direction,RIGHT
     jmp end_update_direction
 update_direction_down:
     mov bl,snake_direction
-    cmp bl,UP
+    cmp bl,UP ; cant go down if current direction is up
     je end_update_direction
     mov snake_direction,DOWN
     jmp end_update_direction
@@ -155,7 +156,7 @@ update_game_array_to_snake_right:
     lea si,game_area
     mov di,si
     add di,ax
-    mov bl,04Dh
+    mov bl,LEFT ; set LEFT to game array to indicate that next item is left of current
     mov ds:[di],bl
     jmp end_update_snake_right
 adjust_snake_head_to_left_of_screen:
@@ -181,7 +182,7 @@ update_game_array_to_snake_down:
     lea si,game_area
     mov di,si
     add di,ax
-    mov bl,04Dh
+    mov bl,UP ; set UP to game array to indicate that next item is up of current
     mov ds:[di],bl
     jmp end_update_snake_down
 adjust_snake_head_to_top_of_screen:
@@ -207,7 +208,7 @@ update_game_array_to_snake_up:
     lea si,game_area
     mov di,si
     add di,ax
-    mov bl,04Dh
+    mov bl,DOWN ; set DOWN to game array to indicate that next item is down of current
     mov ds:[di],bl
     jmp end_update_snake_up
 adjust_snake_head_to_down_of_screen:
@@ -235,7 +236,7 @@ update_game_array_to_snake_left:
     lea si,game_area
     mov di,si
     add di,ax
-    mov bl,04Dh
+    mov bl,RIGHT ; set RIGHT to game array to indicate that next item is right of current
     mov ds:[di],bl
     jmp end_update_snake_left
 adjust_snake_head_to_right_of_screen:
@@ -247,7 +248,6 @@ end_update_snake_left:
 update_snake_left endp
 
 update_snake_tail proc
-    call erase_current_snake_tail
     mov ax,0000h
     mov bx,0000h
     mov al,snake_tail_y
@@ -257,142 +257,186 @@ update_snake_tail proc
     lea si,game_area
     add si,ax
     mov snake_tail_orig_si,si
-    mov di,si
-    mov bl,00h
-    mov ds:[di],bl ; first set current tail to 0 (clear in game array)
+    mov bl,ds:[si]
+    cmp bl,UP
+    je call_check_area_to_up_of_current_snake_tail
+    cmp bl,LEFT
+    je call_check_area_to_left_of_current_snake_tail
+    cmp bl,DOWN
+    je call_check_area_to_down_of_current_snake_tail
+    cmp bl,RIGHT
+    je call_check_area_to_right_of_current_snake_tail
+    jmp end_update_snake_tail
+call_check_area_to_up_of_current_snake_tail:
+    call check_area_to_up_of_current_snake_tail
+    call update_snake_tail
+call_check_area_to_left_of_current_snake_tail:
+    call check_area_to_left_of_current_snake_tail
+    call update_snake_tail
+call_check_area_to_down_of_current_snake_tail:
+    call check_area_to_down_of_current_snake_tail
+    call update_snake_tail
+call_check_area_to_right_of_current_snake_tail:
+    call check_area_to_right_of_current_snake_tail
+    call update_snake_tail
+end_update_snake_tail:
+    mov al,snake_head_x
+    mov snake_tail_x,al
+    mov al,snake_head_y
+    mov snake_head_y,al
+    ret
+update_snake_tail endp
 
-    ; then check if column to the right of current tail is M, if yes, update snake tail to right
-start_check_area_to_the_right_of_snake_tail:
-    mov al,snake_tail_x
-    cmp al,game_area_column_count
-    je adjust_snake_tail_check_right_offset
-    add si,01h
-check_area_to_the_right_of_snake_tail:
-    mov al,ds:[si]
-    cmp al,4Dh
-    je update_snake_tail_right
-    mov si,snake_tail_orig_si
-    jmp start_check_area_to_the_left_of_snake_tail
-adjust_snake_tail_check_right_offset:
+check_area_to_up_of_current_snake_tail proc
     mov ax,0000h
-    mov al,game_area_column_count
-    sub si,ax
-    jmp check_area_to_the_right_of_snake_tail
-update_snake_tail_right:
     mov bx,0000h
-    mov bl,snake_tail_x
-    cmp bl,game_area_column_count
-    je adjust_snake_tail_to_left_of_screen
-    add bl,01h
-set_new_snake_tail_right:
-    mov snake_tail_x,bl
-    jmp update_snake_tail_end
-adjust_snake_tail_to_left_of_screen:
-    mov bl,00h
-    jmp set_new_snake_tail_right
-
-    ; if not, check if column to the left, current minus two is M, if yes, update snake tail to the right
-start_check_area_to_the_left_of_snake_tail:
-    mov al,snake_tail_x
-    cmp al,00h
-    je adjust_snake_tail_check_left_offset
-check_area_to_the_left_of_snake_tail:
-    sub si,01h
-    mov al,ds:[si]
-    cmp al,4Dh
-    je update_snake_tail_left
-    mov si,snake_tail_orig_si
-    jmp start_check_area_to_the_up_of_snake_tail
-adjust_snake_tail_check_left_offset:
-    mov ax,0000h
-    mov al,game_area_column_count
-    add si,ax
-    jmp check_area_to_the_left_of_snake_tail
-update_snake_tail_left:
-    mov bx,0000h
-    mov bl,snake_tail_x
-    cmp bl,00h
-    je adjust_snake_tail_to_right_of_screen
-set_new_snake_tail_left:
-    sub bl,01h
-    mov snake_tail_x,bl
-    jmp update_snake_tail_end
-adjust_snake_tail_to_right_of_screen:
-    mov bl,game_area_column_count
-    jmp set_new_snake_tail_left
-
-    ; if still not, check if column to up is M, current minus column count, if yes, update snake tail to up
-start_check_area_to_the_up_of_snake_tail:
     mov al,snake_tail_y
     cmp al,00h
     je adjust_snake_tail_check_up_offset
-    mov bx,0000h
     mov bl,game_area_column_count
     sub si,bx
+    
+    mov al,snake_tail_y
+    sub al,01h
+    mov snake_tail_y,al
 check_area_to_the_up_of_snake_tail:
     mov al,ds:[si]
-    cmp al,4Dh
-    je update_snake_tail_up
-    mov si,snake_tail_orig_si
-    jmp start_check_area_to_the_down_of_snake_tail
+    cmp al,STOP ; if area to up has STOP, than current should be set to STOP and value up to 0
+    je update_snake_tail_above
+    jmp end_check_area_to_up_of_current_snake_tail
 adjust_snake_tail_check_up_offset:
+    mov al,game_area_row_count
+    sub al,01h
+    mov snake_tail_y,al
+
     mov ax,0000h
     mov al,game_area_row_count
     sub al,01h
     mov bl,game_area_column_count
     mul bl
+    add al,01h
     add al,snake_tail_x
     lea si,game_area
     add si,ax
     jmp check_area_to_the_up_of_snake_tail
-update_snake_tail_up:
-    mov bx,0000h
-    mov bl,snake_tail_y
-    cmp bl,00h
-    je adjust_snake_tail_to_down_of_screen
-set_new_snake_tail_up:
-    sub bl,01h
-    mov snake_tail_y,bl
-    jmp update_snake_tail_end
-adjust_snake_tail_to_down_of_screen:
-    mov bl,game_area_row_count
-    jmp set_new_snake_tail_up
+update_snake_tail_above:
+    mov di,si
+    mov bl,00h
+    mov ds:[di],bl
+    mov di,snake_tail_orig_si
+    mov bl,STOP
+    mov ds:[di],bl
+    call erase_current_snake_tail
+end_check_area_to_up_of_current_snake_tail:
+    ret
+check_area_to_up_of_current_snake_tail endp
 
-    ; if still not found, check if column to down is M, current + two times column count, if yes, update snake tail to down
-start_check_area_to_the_down_of_snake_tail:
+check_area_to_right_of_current_snake_tail proc
+    mov al,snake_tail_x
+    cmp al,game_area_column_count
+    je adjust_snake_tail_check_right_offset
+    add si,01h
+
+    mov al,snake_tail_x
+    add al,01h
+    mov snake_tail_x,al
+check_area_to_the_right_of_snake_tail:
+    mov al,ds:[si]
+    cmp al,STOP
+    je update_snake_tail_right
+    jmp end_check_area_to_right_of_current_snake_tail
+adjust_snake_tail_check_right_offset:
+    mov snake_tail_x,00h
+
+    mov ax,0000h
+    mov al,game_area_column_count
+    sub si,ax
+    jmp check_area_to_the_right_of_snake_tail
+update_snake_tail_right:
+    mov di,si
+    mov bl,00h
+    mov ds:[di],bl
+    mov di,snake_tail_orig_si
+    mov bl,STOP
+    mov ds:[di],bl
+    call erase_current_snake_tail
+end_check_area_to_right_of_current_snake_tail:
+    ret
+check_area_to_right_of_current_snake_tail endp
+
+check_area_to_down_of_current_snake_tail proc
     mov al,snake_tail_y
     cmp al,game_area_row_count
     je adjust_snake_tail_check_down_offset
     mov bx,0000h
     mov bl,game_area_column_count
     add si,bx
+
+    mov al,snake_tail_y
+    add al,01h
+    mov snake_tail_y,al
 check_area_to_the_down_of_snake_tail:
     mov al,ds:[si]
-    cmp al,4Dh
+    cmp al,STOP
     je update_snake_tail_down
-    jmp update_snake_tail_end
+    jmp end_check_area_to_down_of_current_snake_tail
 adjust_snake_tail_check_down_offset:
+    mov snake_tail_y,00h
+
     lea si,game_area
     mov ax,0000h
     mov al,snake_tail_x
     add si,ax
     jmp check_area_to_the_down_of_snake_tail
 update_snake_tail_down:
-    mov bx,0000h
-    mov bl,snake_tail_y
-    cmp bl,game_area_row_count
-    je adjust_snake_tail_to_top_of_screen
-    add bl,01h
-set_new_snake_tail_down:
-    mov snake_tail_y,bl
-    jmp update_snake_tail_end
-adjust_snake_tail_to_top_of_screen:
+    mov di,si
     mov bl,00h
-    jmp set_new_snake_tail_down
-
-update_snake_tail_end:
+    mov ds:[di],bl
+    mov di,snake_tail_orig_si
+    mov bl,STOP
+    mov ds:[di],bl
+    call erase_current_snake_tail
+end_check_area_to_down_of_current_snake_tail:  
     ret
-update_snake_tail endp
+check_area_to_down_of_current_snake_tail endp
+
+check_area_to_left_of_current_snake_tail proc
+    mov ax,0000h
+    mov bx,0000h
+
+    mov al,snake_tail_x
+    cmp al,00h
+    je adjust_snake_tail_check_left_offset
+
+    sub al,01h
+    mov snake_tail_x,al
+check_area_to_the_left_of_snake_tail:
+    mov al,snake_tail_y
+    mov bl,game_area_column_count
+    mul bl
+    add al,snake_tail_x
+    lea si,game_area
+    add si,ax
+    mov al,ds:[si]
+    cmp al,STOP
+    je update_snake_tail_left
+    jmp end_check_area_to_left_of_current_snake_tail
+adjust_snake_tail_check_left_offset:
+    mov al,game_area_column_count
+    sub al,01h
+    mov snake_tail_x,al
+    jmp check_area_to_the_left_of_snake_tail
+update_snake_tail_left:
+    mov di,si
+    mov bl,00h
+    mov ds:[di],bl
+    mov di,snake_tail_orig_si
+    mov bl,STOP
+    mov ds:[di],bl
+end_check_area_to_left_of_current_snake_tail:
+    call erase_current_snake_tail
+    ret
+check_area_to_left_of_current_snake_tail endp
 
 print_snake proc
     mov al,00h
@@ -410,8 +454,8 @@ read_game_area_array:
     add al,game_area_x_loop_index
     add si,ax
     mov cl,ds:[si]
-    cmp cl,4Dh
-    je print_single_snake_part
+    cmp cl,00h
+    jne print_single_snake_part ; if array has something else than 0, print it
 increase_game_area_loop_indices:
     mov al,game_area_x_loop_index
     add al,01h
@@ -506,10 +550,11 @@ init_game_area_array proc
     add ax,03h ; add 3 to ax which contains position of array row. Result should be 4th row, 3rd index
     mov di,si ; store array start location in memory to di (destination index)
     add di,ax ; add calculated offset to ax
-    mov bl,04Dh ; add 4D (ascii letter m as in mato) to bl
-    mov ds:[di],bl ; store M to memory address in di
+    mov bl,STOP ; move 53 (ascii letter S as in stop) to bl
+    mov ds:[di],bl ; store S to memory address in di
     inc di ; increase di to point to next array location
-    mov ds:[di],bl ; store M to next location also. This is repeated for following two rows.
+    mov bl,LEFT ; move 4C (ascii letter L as left) to bl
+    mov ds:[di],bl ; store L to next location. This is repeated for following two rows.
     inc di
     mov ds:[di],bl
     inc di
